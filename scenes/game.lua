@@ -30,7 +30,9 @@ local board = {}
 local gems = bean.group()
 local layout
 local score
-local current_layout = 1
+local moves_text
+local current_layout = 3
+local total_moves = 0
 
 local origin_x = 218
 local origin_y = 80
@@ -38,13 +40,27 @@ local layouts = {
     -- default
     [1] = {
         rows = { 6, 7, 6, 7, 6, 7, 6 },
-        origin = { x = 218, y = 80 }
+        origin = { x = 218, y = 80 },
+        moves = 15
+    },
+
+    [2] = {
+        rows = { 3, 8, 9, 8, 3, 6, 9 },
+        origin = { x = 190, y = 80 },
+        moves = 15
+    },
+
+    [3] = {
+        rows = { 10, 9, 4, 3, 2, 5, 6 },
+        origin = { x = 180, y = 96 },
+        moves = 15
     },
 
     -- the shield
-    [2] = {
+    [4] = {
         rows = { 2, 3, 6, 7, 8, 9, 8, 7, 6, 3, 2 },
-        origin = { x = 180, y = 24 }
+        origin = { x = 180, y = 24 },
+        goal = 10000
     },
 }
 
@@ -377,6 +393,9 @@ local function detonate_gem(gem, queue)
                 table.insert(queue, target)
             else
                 target.armed = true
+                if target.gem_type == "pulse" then
+                    target.blast_cells = compute_blast_cells(target)
+                end
                 table.insert(arm_queue, target)
             end
         end
@@ -395,7 +414,7 @@ local function detonate_gem(gem, queue)
                 end
 
                 remove_gem(g)
-                bean.fx(g.pos, "arrow_impact")
+                bean.fx(g.pos,"arrow_impact")
                 bean.play(g.gem_type, { pitch = i })
             end)
     end
@@ -437,6 +456,9 @@ local function resolve_click(start_gem)
             detonate_gem(gem, queue)
         end
     end
+
+    total_moves = total_moves + 1
+    moves_text.text.str = "Moves:" .. total_moves
 end
 
 -- the scene
@@ -447,6 +469,7 @@ return function(sc)
     board = {}
     layout = layouts[current_layout]
     layout.row_offsets = compute_row_offsets()
+    total_moves = 0
 
     origin_x = layout.origin.x
     origin_y = layout.origin.y
@@ -546,6 +569,12 @@ return function(sc)
         bean.pos(360, 36),
         bean.color("ffd9e5"),
         bean.anchor("center")
+    }
+
+    moves_text = bean.add {
+        bean.text("Moves:" .. total_moves),
+        bean.pos(570, 48),
+        bean.color("ff81a9")
     }
 
     sc.tick = function(dt)

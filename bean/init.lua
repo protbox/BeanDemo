@@ -369,7 +369,7 @@ function b.tween(target, vars, dur)
 end
 
 function b.vec2(x, y)
-    return { x = x, y = y }
+    return { x = x, y = y or x }
 end
 
 function b.pos(x, y)

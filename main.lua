@@ -15,7 +15,7 @@ bean.start {
     }
 }
 
-bean.load_font("font", "fonts/PressStart2P-Regular.ttf", 16)
+bean.load_font("font", "fonts/PressStart2P-Regular.ttf", 12)
 
 bean.load_sprite("background", "img/background.png")
 bean.load_sprite("hex", "img/hex.png")
