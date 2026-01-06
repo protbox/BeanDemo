@@ -567,7 +567,7 @@ return function(sc)
     score = bean.add {
         bean.text(0),
         bean.pos(360, 36),
-        bean.color("ffd9e5"),
+        bean.color("#ffd9e5"),
         bean.anchor("center")
     }
 

@@ -362,10 +362,24 @@ function BEAN_GROUP:bake(opts)
     local max_x, max_y = -math.huge, -math.huge
 
     for _, e in ipairs(self.entities) do
+        b.reset_anchor(e)
         local p = e.pos
-        local s = e.sprite
-        local fw = s.asset.frame_width
-        local fh = s.asset.frame_height
+        local s, fw, fh
+
+        if e.sprite then
+            s = e.sprite
+            fw = s.asset.frame_width
+            fh = s.asset.frame_height
+        elseif e.rect then
+            s = e.rect
+            fw = s.w
+            fh = s.h
+        elseif e.text then
+            s = e.text
+            local font = e.font and b.fonts[e.font.id] or b.fonts.font
+            fw = font:getWidth(s.value)
+            fh = font:getHeight() 
+        end
 
         local x1 = p.x - s.offset.x
         local y1 = p.y - s.offset.y
@@ -393,31 +407,72 @@ function BEAN_GROUP:bake(opts)
     -- draw all entities into canvas
     for _, e in ipairs(self.entities) do
         local p = e.pos
-        local s = e.sprite
+        local s
 
-        local quad = s.asset.frames[s.frame]
+        if e.color then
+            lg.setColor(e.color.r, e.color.g, e.color.b, e.color.a)
+        else
+            lg.setColor(1, 1, 1, 1)
+        end
 
-        lg.draw(
-            s.img,
-            quad,
-            p.x - min_x,
-            p.y - min_y,
-            s.rot,
-            s.scale.x,
-            s.scale.y,
-            s.offset.x,
-            s.offset.y
-        )
+        if e.sprite then            
+            s = e.sprite
+
+            local quad = s.asset.frames[s.frame]
+
+            lg.draw(
+                s.img,
+                quad,
+                p.x - min_x,
+                p.y - min_y,
+                s.rot,
+                s.scale.x,
+                s.scale.y,
+                s.offset.x,
+                s.offset.y
+            )
+        elseif e.rect then
+            s = e.rect
+
+            lg.rectangle(
+                "fill",
+                p.x - min_x,
+                p.y - min_y,
+                s.w,
+                s.h,
+                s.round.x,
+                s.round.y
+            )
+        elseif e.text then
+            local font = e.font and b.fonts[e.font.id] or b.fonts.font
+            lg.setFont(font)
+
+            s = e.text
+
+            lg.print(
+                s.value,
+                p.x - min_x,
+                p.y - min_y,
+                s.rot,
+                s.scale.x,
+                s.scale.y,
+                s.offset.x,
+                s.offset.y
+            )
+        end
     end
+
+    lg.setColor(1, 1, 1, 1)
+    lg.setFont(b.fonts.font)
 
     lg.setCanvas()
 
     -- destroy the originals
     self:destroy()
 
-    local baked = bean.add {
-        bean.baked_sprite(canvas),
-        bean.pos(min_x, min_y)
+    local baked = b.add {
+        b.baked_sprite(canvas),
+        b.pos(min_x, min_y)
     }
 
     return baked
@@ -439,7 +494,7 @@ function b.vec2(x, y)
 end
 
 function b.pos(x, y)
-    return { __type = "pos", x = x, y = y }
+    return { __type = "pos", x = x, y = y or x }
 end
 
 function b.set_pos(e, x, y)
@@ -654,7 +709,7 @@ function b.baked_sprite(canvas)
                 lg.newQuad(0, 0, w, h, w, h)
             },
             frame_width = w,
-            frame_height =h
+            frame_height = h
         },
         frame = 1,
         rot = 0,
@@ -664,11 +719,12 @@ function b.baked_sprite(canvas)
     }
 end
 
-function b.rect(w, h)
+function b.rect(w, h, rx, ry)
     return {
         __type = "rect",
         w = w,
         h = h,
+        round = { rx = rx or 0, ry = ry or 0 },
         scale  = { x = 1, y = 1 },
         offset = { x = 0, y = 0 },
         rot    = 0,
@@ -703,6 +759,14 @@ end
 function b.set_text(e, value)
     e.text.value = value
     b.reset_anchor(e)
+end
+
+function b.get_center(e)
+    if __type == "shape" then
+        if e.rect then
+            return e.rect.x + e.rect.w
+        end
+    end
 end
 
 -- use id "font" to override the default font
@@ -757,13 +821,50 @@ function b.area()
 end
 
 function b.get_bounds(e)
-    local fw = e.sprite.asset.frame_width
-    local fh = e.sprite.asset.frame_height
+    local x = e.pos.x
+    local y = e.pos.y
 
-    local x = e.pos.x - e.sprite.offset.x
-    local y = e.pos.y - e.sprite.offset.y
+    -- sprite
+    if e.sprite then
+        local s = e.sprite
+        local fw = s.asset.frame_width * s.scale.x
+        local fh = s.asset.frame_height * s.scale.y
 
-    return x, y, fw, fh
+        return
+            x - s.offset.x,
+            y - s.offset.y,
+            fw,
+            fh
+    end
+
+    -- rect
+    if e.rect then
+        local r = e.rect
+        local fw = r.w * r.scale.x
+        local fh = r.h * r.scale.y
+
+        return
+            x - r.offset.x,
+            y - r.offset.y,
+            fw,
+            fh
+    end
+
+    -- text
+    if e.text then
+        local t = e.text
+        local font = e.font and b.fonts[e.font.id] or b.fonts.font
+        local fw = font:getWidth(t.value) * t.scale.x
+        local fh = font:getHeight() * t.scale.y
+
+        return
+            x - t.offset.x,
+            y - t.offset.y,
+            fw,
+            fh
+    end
+
+    return nil
 end
 
 function b.mousepos() return res.get_mouse_position(b.opts.width, b.opts.height) end
@@ -809,8 +910,8 @@ end
 
 function b.draw()
     b.systems.sprite_draw.draw()
-    b.systems.text_draw.draw()
     b.systems.shape_draw.draw()
+    b.systems.text_draw.draw()
 end
 
 --[[ love callbacks ]]
