@@ -31,7 +31,7 @@ local gems = bean.group()
 local layout
 local score
 local moves_text
-local current_layout = 3
+local current_layout = 1
 local total_moves = 0
 
 local origin_x = 218
@@ -322,7 +322,7 @@ end
 
 -- gameplay helpers
 local function add_score(n)
-    score.text.str = score.text.str + n
+    score.text.value = score.text.value + n
     bean.tween(score.text.scale, bean.vec2(1.4, 1.4), 0.2)
         :after(score.text.scale, bean.vec2(1, 1), 0.1)
 end
@@ -458,7 +458,7 @@ local function resolve_click(start_gem)
     end
 
     total_moves = total_moves + 1
-    moves_text.text.str = "Moves:" .. total_moves
+    moves_text.text.value[4] = total_moves
 end
 
 -- the scene
@@ -572,9 +572,13 @@ return function(sc)
     }
 
     moves_text = bean.add {
-        bean.text("Moves:" .. total_moves),
-        bean.pos(570, 48),
-        bean.color("ff81a9")
+        bean.text {
+            bean.col("#ff81a9"),
+            "Moves:",
+            bean.col("#ffd9e5"),
+            total_moves
+        },
+        bean.pos(570, 48)
     }
 
     sc.tick = function(dt)

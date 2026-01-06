@@ -131,7 +131,7 @@ function b.start(opts)
                 local t = e.text
 
                 if e.anchor and e.anchor.mode == ANCHOR.CENTER then
-                    local w = font:getWidth(t.str)
+                    local w = font:getWidth(t.value)
                     local h = font:getHeight()
                     t.offset.x = w / 2
                     t.offset.y = h / 2
@@ -141,7 +141,7 @@ function b.start(opts)
                 end
 
                 love.graphics.print(
-                    t.str,
+                    t.value,
                     p.x,
                     p.y,
                     t.rot,
@@ -598,10 +598,10 @@ function b.baked_sprite(canvas)
     }
 end
 
-function b.text(str)
+function b.text(value)
     return {
         __type = "text",
-        str = str,
+        value = value,
 
         scale  = { x = 1, y = 1 },
         offset = { x = 0, y = 0 },
@@ -625,6 +625,11 @@ function b.font(id)
     }
 end
 
+function b.col(hex, alpha)
+    hex = hex:gsub("#", "")
+    return hex_to_color(hex, alpha)
+end
+
 function b.color(hex, alpha)
     -- let 'em use a hash at the front
     hex = hex:gsub("#", "")
@@ -643,9 +648,9 @@ function b.fx(pvec, t)
     shimmer:add(pvec.x, pvec.y, presets[t])
 end
 
-function b.set_text(e, str)
+function b.set_text(e, value)
     if e.text then
-        e.text.str = str
+        e.text.value = value
     end
 end
 
