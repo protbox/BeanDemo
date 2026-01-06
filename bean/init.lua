@@ -10,6 +10,12 @@ local baton = require(PATH .. ".baton")
 local shimmer
 local presets
 
+-- enums
+local ANCHOR = {
+    DEFAULT = 1,
+    CENTER = 2
+}
+
 --[[ helpers ]]
 local function hex_to_color(hex, alpha)
     return { tonumber("0x" .. hex:sub(1,2)) / 255,
@@ -43,12 +49,6 @@ local function point_in_rect(px, py, x, y, w, h)
     return px >= x and px <= x + w
        and py >= y and py <= y + h
 end
-
--- enums
-local ANCHOR = {
-    DEFAULT = 1,
-    CENTER = 2
-}
 
 function b.start(opts)
     local defaults = {
@@ -130,16 +130,6 @@ function b.start(opts)
                 local font = e.font and b.fonts[e.font.id] or b.fonts.font
                 local t = e.text
 
-                if e.anchor and e.anchor.mode == ANCHOR.CENTER then
-                    local w = font:getWidth(t.value)
-                    local h = font:getHeight()
-                    t.offset.x = w / 2
-                    t.offset.y = h / 2
-                else
-                    t.offset.x = 0
-                    t.offset.y = 0
-                end
-
                 love.graphics.print(
                     t.value,
                     p.x,
@@ -165,15 +155,6 @@ function b.start(opts)
                 local s = e.sprite
                 local quad = s.asset.frames[s.frame]
 
-                if e.anchor and e.anchor.mode == ANCHOR.CENTER then
-                    local fw, fh = s.asset.frame_width, s.asset.frame_height
-                    s.offset.x = fw / 2
-                    s.offset.y = fh / 2
-                else
-                    s.offset.x = 0
-                    s.offset.y = 0
-                end
-
                 lg.draw(
                     s.img,
                     quad,
@@ -188,6 +169,54 @@ function b.start(opts)
         sort = function(j, k)
             local za = j.z and j.z.value or 0
             local zb = k.z and k.z.value or 0
+            return za < zb
+        end
+    }
+
+    b.systems.shape_draw = {
+        entities = {},
+
+        draw = function()
+            for _, e in ipairs(b.systems.shape_draw.entities) do
+                local p = e.pos
+
+                if e.color then
+                    lg.setColor(e.color.r, e.color.g, e.color.b, e.color.a)
+                end
+
+                if e.rect then
+                    local r = e.rect
+                    lg.rectangle(
+                        "fill",
+                        p.x,
+                        p.y,
+                        r.w,
+                        r.h,
+                        r.rot,
+                        r.scale.x,
+                        r.scale.y,
+                        r.offset.x,
+                        r.offset.y
+                    )
+                elseif e.circle then
+                    local c = e.circle
+                    lg.circle(
+                        "fill",
+                        p.x,
+                        p.y,
+                        c.r,
+                        c.scale.x,
+                        c.scale.y
+                    )
+                end
+            end
+
+            lg.setColor(1, 1, 1, 1)
+        end,
+
+        sort = function(a, b)
+            local za = a.z and a.z.value or 0
+            local zb = b.z and b.z.value or 0
             return za < zb
         end
     }
@@ -260,7 +289,44 @@ function b.add(components)
         b.resort()
     end
 
+    b.reset_anchor(e)
     return e
+end
+
+function b.reset_anchor(e)
+    if not e.anchor or e.anchor.mode ~= ANCHOR.CENTER then
+        return
+    end
+
+    -- sprite
+    if e.sprite then
+        local s = e.sprite
+        s.offset.x = s.asset.frame_width / 2
+        s.offset.y = s.asset.frame_height / 2
+        return
+    end
+
+    -- rect
+    if e.rect then
+        local r = e.rect
+        r.offset.x = r.w / 2
+        r.offset.y = r.h / 2
+        return
+    end
+
+    -- text
+    if e.text then
+        local font = e.font and b.fonts[e.font.id] or b.fonts.font
+        local value = e.text.value
+
+        local w = font:getWidth(value)
+        local h = font:getHeight()
+
+        e.text.offset.x = w / 2
+        e.text.offset.y = h / 2
+
+        return
+    end
 end
 
 --[[ groups ]]
@@ -598,6 +664,29 @@ function b.baked_sprite(canvas)
     }
 end
 
+function b.rect(w, h)
+    return {
+        __type = "rect",
+        w = w,
+        h = h,
+        scale  = { x = 1, y = 1 },
+        offset = { x = 0, y = 0 },
+        rot    = 0,
+        systems = { "shape_draw" }
+    }
+end
+
+function b.circle(r)
+    return {
+        __type = "circle",
+        r = r,
+        scale  = { x = 1, y = 1 },
+        offset = { x = 0, y = 0 },
+        rot    = 0,
+        systems = { "shape_draw" }
+    }
+end
+
 function b.text(value)
     return {
         __type = "text",
@@ -609,6 +698,11 @@ function b.text(value)
 
         systems = { "text_draw" }
     }
+end
+
+function b.set_text(e, value)
+    e.text.value = value
+    b.reset_anchor(e)
 end
 
 -- use id "font" to override the default font
@@ -625,6 +719,8 @@ function b.font(id)
     }
 end
 
+-- different from the component (color) version
+-- this one just returns a { r, g, b, a } table
 function b.col(hex, alpha)
     hex = hex:gsub("#", "")
     return hex_to_color(hex, alpha)
@@ -714,6 +810,7 @@ end
 function b.draw()
     b.systems.sprite_draw.draw()
     b.systems.text_draw.draw()
+    b.systems.shape_draw.draw()
 end
 
 --[[ love callbacks ]]

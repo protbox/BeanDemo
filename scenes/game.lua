@@ -322,7 +322,7 @@ end
 
 -- gameplay helpers
 local function add_score(n)
-    score.text.value = score.text.value + n
+    bean.set_text(score, score.text.value + n)
     bean.tween(score.text.scale, bean.vec2(1.4, 1.4), 0.2)
         :after(score.text.scale, bean.vec2(1, 1), 0.1)
 end
