@@ -24,6 +24,37 @@ local function hex_to_color(hex, alpha)
            alpha or 1 }
 end
 
+local function draw_rect_at(x, y, r)
+    lg.push()
+    lg.translate(x, y)
+
+    if r.rot and r.rot ~= 0 then
+        lg.rotate(r.rot)
+    end
+
+    local sx = r.scale and r.scale.x or 1
+    local sy = r.scale and r.scale.y or 1
+    if sx ~= 1 or sy ~= 1 then
+        lg.scale(sx, sy)
+    end
+
+    local ox = r.offset and r.offset.x or 0
+    local oy = r.offset and r.offset.y or 0
+    if ox ~= 0 or oy ~= 0 then
+        lg.translate(-ox, -oy)
+    end
+
+    local rx = 0
+    local ry = 0
+    if r.round then
+        rx = r.round.x or 0
+        ry = r.round.y or rx
+    end
+
+    lg.rectangle("fill", 0, 0, r.w, r.h, rx, ry)
+    lg.pop()
+end
+
 local function load_palette(path)
     local image_data = love.image.newImageData(path)
     local width, height = image_data:getDimensions()
@@ -362,7 +393,6 @@ function BEAN_GROUP:bake(opts)
     local max_x, max_y = -math.huge, -math.huge
 
     for _, e in ipairs(self.entities) do
-        b.reset_anchor(e)
         local p = e.pos
         local s, fw, fh
 
@@ -390,6 +420,7 @@ function BEAN_GROUP:bake(opts)
         if y1 < min_y then min_y = y1 end
         if x2 > max_x then max_x = x2 end
         if y2 > max_y then max_y = y2 end
+        b.reset_anchor(e)
     end
 
     min_x = min_x - padding
@@ -432,17 +463,8 @@ function BEAN_GROUP:bake(opts)
                 s.offset.y
             )
         elseif e.rect then
-            s = e.rect
+            draw_rect_at(p.x - min_x, p.y - min_y, e.rect)
 
-            lg.rectangle(
-                "fill",
-                p.x - min_x,
-                p.y - min_y,
-                s.w,
-                s.h,
-                s.round.x,
-                s.round.y
-            )
         elseif e.text then
             local font = e.font and b.fonts[e.font.id] or b.fonts.font
             lg.setFont(font)
@@ -470,10 +492,25 @@ function BEAN_GROUP:bake(opts)
     -- destroy the originals
     self:destroy()
 
+    local centered = opts and opts.centered
+    local bx = min_x
+    local by = min_y
+
+    if centered then
+        bx = min_x + w / 2
+        by = min_y + h / 2
+    end
+
     local baked = b.add {
         b.baked_sprite(canvas),
-        b.pos(min_x, min_y)
+        b.pos(bx, by),
+        b.anchor(centered and "center" or "default"),
+        b.area()
     }
+
+    b.reset_anchor(baked)
+
+    print(baked.sprite.offset.x, baked.sprite.offset.y)
 
     return baked
 end
@@ -876,6 +913,25 @@ function b.hover(e)
     local x, y, w, h = b.get_bounds(e)
 
     return point_in_rect(mx, my, x, y, w, h)
+end
+
+function b.hover_once(e)
+    if not e.area then return false end
+
+    local hovering = b.hover(e)
+
+    -- first time hover
+    if hovering and not e._hovering then
+        e._hovering = true
+        return true
+    end
+
+    -- reset when mouse leaves
+    if not hovering and e._hovering then
+        e._hovering = false
+    end
+
+    return false
 end
 
 function b.clicked(e, btn)
